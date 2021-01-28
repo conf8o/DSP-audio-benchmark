@@ -1,0 +1,2 @@
+fs,n_mfcc,n_fft,hop_length,n_mels,dct_type
+16000,12,1024,256,20,2
