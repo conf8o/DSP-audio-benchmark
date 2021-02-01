@@ -5,3 +5,4 @@ edition = "2018"
 
 [dependencies]
 rustfft = "5.0.1"
+ndarray = "0.14.0"
