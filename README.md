@@ -13,6 +13,8 @@ SIMD命令でFFTをするライブラリがある言語が良い。GPUは考え�
 * Python
 * Rust
 * Swift
+* Julia
+
 
 ## それぞれの良い点と懸念点
 
@@ -31,6 +33,7 @@ F#     | 関数型、.NET、おもしろい、Xamarinの可能性   | 資料が�
 Python | 慣れてる、一番簡単、資料多い                | 速度は微妙かも(NumPyでも)、 保守性が微妙
 Rust   | 最速、安全、おもしろい                      | GUIが微妙らしい、むずかしい、慣れてない
 Swift  | 慣れてる、楽しい、Apple限定で作るならこれ   | Apple限定(vDSPフレームワーク)
+Julia  | TODO                                        | TODO
 
 ## 考察
 
