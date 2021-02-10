@@ -4,6 +4,7 @@ use plotters::prelude::*;
 use rustfft::{FftPlanner, num_complex::Complex};
 use apodize::{hamming_iter};
 
+/// プロットに表示するxyの範囲
 struct Extent { 
     xstart: f32, 
     xend: f32, 
@@ -22,10 +23,12 @@ impl Extent {
     }
 }
 
+/// startからendをサンプリング周波数rateで区切る
 fn sampling_axis(start: f32, end: f32, rate: f32) -> Array1<f32> {
     Array1::range(start, end, 1.0 / rate)
 }
 
+/// プロットのラップ
 fn plot<Iter1, Iter2>(xs: Iter1, ys: Iter2, file_name: &str, ex: Extent) -> Result<(), Box<dyn std::error::Error>> 
 where 
     Iter1: Iterator<Item = f32>,
@@ -40,6 +43,56 @@ where
     chart.draw_series(LineSeries::new(xs.zip(ys), &RED))?;
 
     Ok(())
+}
+
+/// ハミング窓
+fn hamming(n_fft: usize) -> Array1<f32> {
+    hamming_iter(n_fft).map(|x| x as f32).collect::<Array1<f32>>()
+}
+
+/// オーディオデータを保持するラッパー
+struct Audio {
+    data: Vec<f32>
+}
+
+impl Audio {
+    /// オーディオデータのframe_lenの長さを、hop_lenずつずらしながら取得するイテレータを取得する。
+    fn frame_iter(&self, frame_len: usize, hop_len: usize) -> Frames {
+        Frames { 
+            data: &self.data, 
+            frame_len: frame_len, 
+            hop_len: hop_len, 
+            i: 0
+        }
+    }
+}
+
+struct Frames<'a> {
+    data: &'a Vec<f32>,
+    frame_len: usize,
+    hop_len: usize,
+    i: usize
+}
+
+/// データのframe_lenの長さを、hop_lenずつずらしながら取得するイテレータ
+impl<'a> Iterator for Frames<'a> {
+    type Item = Vec<f32>;
+
+    fn next(&mut self) -> Option<Vec<f32>> {
+        if self.i < self.data.len() {
+            let end = cmp::min(self.i+self.frame_len, self.data.len());
+            let audio_frame = &self.data[self.i..end];
+
+            let mut frame = vec![0.0; self.frame_len];
+            frame[..audio_frame.len()].copy_from_slice(audio_frame);
+
+            self.i += self.hop_len;
+
+            Option::Some(frame)
+        } else {
+            Option::None
+        }
+    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -83,10 +136,6 @@ fn hadamard_product() {
     println!("{:?}", ab);
 }
 
-fn hamming(n_fft: usize) -> Array1<f32> {
-    hamming_iter(n_fft).map(|x| x as f32).collect::<Array1<f32>>()
-}
-
 fn plot_fft(signal: &Array1<f32>, n_fft: usize, file_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     // FFT
     let mut planner = FftPlanner::new();
@@ -99,48 +148,6 @@ fn plot_fft(signal: &Array1<f32>, n_fft: usize, file_name: &str) -> Result<(), B
     plot(xs, ys, file_name, Extent::new(0.0, n_fft as f32 / 2.0, 0.0, 100.0))?;
 
     Ok(())
-}
-
-struct Audio {
-    data: Vec<f32>
-}
-
-impl Audio {
-    fn frame_iter(&self, frame_len: usize, hop_len: usize) -> AudioFrames {
-        AudioFrames { 
-            audio: &self.data, 
-            frame_len: frame_len, 
-            hop_len: hop_len, 
-            i: 0
-        }
-    }
-}
-
-struct AudioFrames<'a> {
-    audio: &'a Vec<f32>,
-    frame_len: usize,
-    hop_len: usize,
-    i: usize
-}
-
-impl<'a> Iterator for AudioFrames<'a> {
-    type Item = Vec<f32>;
-
-    fn next(&mut self) -> Option<Vec<f32>> {
-        if self.i < self.audio.len() {
-            let end = cmp::min(self.i+self.frame_len, self.audio.len());
-            let audio_frame = &self.audio[self.i..end];
-
-            let mut frame = vec![0.0; self.frame_len];
-            frame[..audio_frame.len()].copy_from_slice(audio_frame);
-
-            self.i += self.hop_len;
-
-            Option::Some(frame)
-        } else {
-            Option::None
-        }
-    }
 }
 
 fn audio_frame() {
