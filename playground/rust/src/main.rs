@@ -1,3 +1,4 @@
+use std::cmp;
 use ndarray::{Array1, array};
 use plotters::prelude::*;
 use rustfft::{FftPlanner, num_complex::Complex};
@@ -7,12 +8,17 @@ struct Extent {
     xstart: f32, 
     xend: f32, 
     ystart: f32, 
-    yend: f32,
+    yend: f32
 }
 
 impl Extent {
     fn new(xstart: f32, xend: f32, ystart: f32, yend: f32) -> Self {
-        Self {xstart: xstart, xend: xend, ystart: ystart, yend: yend}
+        Self {
+            xstart: xstart, 
+            xend: xend, 
+            ystart: ystart, 
+            yend: yend
+        }
     }
 }
 
@@ -23,7 +29,7 @@ fn sampling_axis(start: f32, end: f32, rate: f32) -> Array1<f32> {
 fn plot<Iter1, Iter2>(xs: Iter1, ys: Iter2, file_name: &str, ex: Extent) -> Result<(), Box<dyn std::error::Error>> 
 where 
     Iter1: Iterator<Item = f32>,
-    Iter2: Iterator<Item = f32>,
+    Iter2: Iterator<Item = f32>
 {
     let root = BitMapBackend::new(file_name, (640, 480)).into_drawing_area();
     root.fill(&WHITE)?;
@@ -37,7 +43,12 @@ where
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // アダマール積確認用
     hadamard_product();
+
+    // STFT用のイテレータを確認用
+    audio_frame();
+
     // sinの合成波
     let n_fft = 2048;
     let times = sampling_axis(0.0, 1.0, n_fft as f32);
@@ -49,14 +60,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let wave = a + b + c;
     plot(times.iter().map(|x| *x), wave.iter().map(|x| *x), "output/sin.png", Extent::new(0.0, 1.0, -10.0, 10.0))?;
 
+    // FFTのプロット
     plot_fft(&wave, n_fft, "output/fft_sin.png")?;
 
+    // 窓関数のプロット
     let window = hamming(n_fft);
     plot(times.iter().map(|x| *x), window.iter().map(|x| *x), "output/hamming.png", Extent::new(0.0, 1.0, 0.0, 1.0))?;
 
     let windowed = window * wave;
     plot(times.iter().map(|x| *x), windowed.iter().map(|x| *x), "output/windowed_sin.png", Extent::new(0.0, 1.0, -10.0, 10.0))?;
 
+    // 窓関数適用後のFFTのプロット
     plot_fft(&windowed, n_fft, "output/fft_windowed_sin.png")?;
 
     Ok(())
@@ -85,4 +99,56 @@ fn plot_fft(signal: &Array1<f32>, n_fft: usize, file_name: &str) -> Result<(), B
     plot(xs, ys, file_name, Extent::new(0.0, n_fft as f32 / 2.0, 0.0, 100.0))?;
 
     Ok(())
+}
+
+struct Audio {
+    data: Vec<f32>
+}
+
+impl Audio {
+    fn frame_iter(&self, frame_len: usize, hop_len: usize) -> AudioFrames {
+        AudioFrames { 
+            audio: &self.data, 
+            frame_len: frame_len, 
+            hop_len: hop_len, 
+            i: 0
+        }
+    }
+}
+
+struct AudioFrames<'a> {
+    audio: &'a Vec<f32>,
+    frame_len: usize,
+    hop_len: usize,
+    i: usize
+}
+
+impl<'a> Iterator for AudioFrames<'a> {
+    type Item = Vec<f32>;
+
+    fn next(&mut self) -> Option<Vec<f32>> {
+        if self.i < self.audio.len() {
+            let end = cmp::min(self.i+self.frame_len, self.audio.len());
+            let audio_frame = &self.audio[self.i..end];
+
+            let mut frame = vec![0.0; self.frame_len];
+            frame[..audio_frame.len()].copy_from_slice(audio_frame);
+
+            self.i += self.hop_len;
+
+            Option::Some(frame)
+        } else {
+            Option::None
+        }
+    }
+}
+
+fn audio_frame() {
+    let audio = Audio{ data: vec![1., 2., 3., 4., 5., 6.] };
+    let frame_len = 3;
+    let hop_len = 1;
+    let audio_frames = audio.frame_iter(frame_len, hop_len);
+    for frame in audio_frames {
+        println!("{:?}", frame);
+    }
 }
