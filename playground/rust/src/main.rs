@@ -111,9 +111,9 @@ fn frames(n: usize, frame_len: usize, hop_len: usize) {
         
         let mut fft_buf = Array1::<f32>::zeros(frame_len);
         {
-            let slice_a = &a.slice(s![i*hop_len..end]);
-            let mut buf_slice = fft_buf.slice_mut(s![..slice_a.len()]);
-            buf_slice.assign(slice_a);
+            let a_slice = &a.slice(s![i*hop_len..end]);
+            let mut buf_slice = fft_buf.slice_mut(s![..a_slice.len()]);
+            buf_slice.assign(a_slice);
         }
         // 窓関数適用
         fft_buf *= &window;
