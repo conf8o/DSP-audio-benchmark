@@ -1,5 +1,5 @@
 use std::cmp;
-use ndarray::{Array1, array};
+use ndarray::prelude::*;
 use plotters::prelude::*;
 use rustfft::{FftPlanner, num_complex::Complex};
 use apodize::{hamming_iter};
@@ -46,8 +46,8 @@ where
 }
 
 /// ハミング窓
-fn hamming(n_fft: usize) -> Array1<f32> {
-    hamming_iter(n_fft).map(|x| x as f32).collect::<Array1<f32>>()
+fn hamming(frame_len: usize) -> Array1<f32> {
+    hamming_iter(frame_len).map(|x| x as f32).collect::<Array1<f32>>()
 }
 
 /// オーディオデータを保持するラッパー
@@ -95,45 +95,67 @@ impl<'a> Iterator for Frames<'a> {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // アダマール積確認用
-    hadamard_product();
+fn frames(n: usize, frame_len: usize, hop_len: usize) {
+    let a = Array1::range(0., n as f32, 1.);
 
-    // STFT用のイテレータを確認用
-    audio_frame();
+    // STFTの結果格納用
+    let mut m = Array2::<f32>::zeros((n / hop_len, frame_len));
 
-    // sinの合成波
-    let n_fft = 2048;
-    let times = sampling_axis(0.0, 1.0, n_fft as f32);
-    let w = 2.0 * std::f32::consts::PI;
-    let a = times.mapv(|x| 1.0 * (w * x * 10.0).sin());
-    let b = times.mapv(|x| 2.0 * (w * x * 20.0).sin());
-    let c = times.mapv(|x| 3.0 * (w * x * 30.0).sin());
+    // ハミング窓
+    let window = hamming(frame_len);
 
-    let wave = a + b + c;
-    plot(times.iter().map(|x| *x), wave.iter().map(|x| *x), "output/sin.png", Extent::new(0.0, 1.0, -10.0, 10.0))?;
+    // 行ごとにアサインしていく
+    for (i, mut row) in m.axis_iter_mut(Axis(0)).enumerate() {
+        let end = cmp::min(i*hop_len+frame_len, a.len());
 
-    // FFTのプロット
-    plot_fft(&wave, n_fft, "output/fft_sin.png")?;
+        
+        let mut fft_buf = Array1::<f32>::zeros(frame_len);
+        {
+            let slice_a = &a.slice(s![i*hop_len..end]);
+            let mut buf_slice = fft_buf.slice_mut(s![..slice_a.len()]);
+            buf_slice.assign(slice_a);
+        }
+        // 窓関数適用
+        fft_buf *= &window;
 
-    // 窓関数のプロット
-    let window = hamming(n_fft);
-    plot(times.iter().map(|x| *x), window.iter().map(|x| *x), "output/hamming.png", Extent::new(0.0, 1.0, 0.0, 1.0))?;
-
-    let windowed = window * wave;
-    plot(times.iter().map(|x| *x), windowed.iter().map(|x| *x), "output/windowed_sin.png", Extent::new(0.0, 1.0, -10.0, 10.0))?;
-
-    // 窓関数適用後のFFTのプロット
-    plot_fft(&windowed, n_fft, "output/fft_windowed_sin.png")?;
-
-    Ok(())
+        // TODO to_vecからのFFT
+        let ffted = fft_buf;
+        row.assign(&ffted);
+    }
+    println!("{:?}", m);
 }
 
-fn hadamard_product() {
-    let a = array![1, 2, 3, 4, 5];
-    let b = array![5, 4, 3, 2, 1];
-    let ab = a * b;
-    println!("{:?}", ab);
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    frames(8, 3, 2);
+
+    // // STFT用のイテレータを確認用
+    // audio_frame();
+
+    // // sinの合成波
+    // let n_fft = 2048;
+    // let times = sampling_axis(0.0, 1.0, n_fft as f32);
+    // let w = 2.0 * std::f32::consts::PI;
+    // let a = times.mapv(|x| 1.0 * (w * x * 10.0).sin());
+    // let b = times.mapv(|x| 2.0 * (w * x * 20.0).sin());
+    // let c = times.mapv(|x| 3.0 * (w * x * 30.0).sin());
+
+    // let wave = a + b + c;
+    // plot(times.iter().map(|x| *x), wave.iter().map(|x| *x), "output/sin.png", Extent::new(0.0, 1.0, -10.0, 10.0))?;
+
+    // // FFTのプロット
+    // plot_fft(&wave, n_fft, "output/fft_sin.png")?;
+
+    // // 窓関数のプロット
+    // let window = hamming(n_fft);
+    // plot(times.iter().map(|x| *x), window.iter().map(|x| *x), "output/hamming.png", Extent::new(0.0, 1.0, 0.0, 1.0))?;
+
+    // let windowed = window * wave;
+    // plot(times.iter().map(|x| *x), windowed.iter().map(|x| *x), "output/windowed_sin.png", Extent::new(0.0, 1.0, -10.0, 10.0))?;
+
+    // // 窓関数適用後のFFTのプロット
+    // plot_fft(&windowed, n_fft, "output/fft_windowed_sin.png")?;
+
+    Ok(())
 }
 
 fn plot_fft(signal: &Array1<f32>, n_fft: usize, file_name: &str) -> Result<(), Box<dyn std::error::Error>> {
