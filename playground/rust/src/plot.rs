@@ -45,9 +45,6 @@ where
 }
 
 fn plot_sin_waves_fft() -> Result<(), Box<dyn std::error::Error>> {
-    // STFT用のイテレータを確認用
-    audio_frame();
-
     // sinの合成波
     let n_fft = 2048;
     let times = sampling_axis(0.0, 1.0, n_fft as f32);
@@ -60,7 +57,7 @@ fn plot_sin_waves_fft() -> Result<(), Box<dyn std::error::Error>> {
     plot(times.iter().map(|x| *x), wave.iter().map(|x| *x), "output/sin.png", Extent::new(0.0, 1.0, -10.0, 10.0))?;
 
     // FFTのプロット
-    plot_fft(&wave, n_fft, "output/fft_sin.png")?;
+    plot_fft(&wave, "output/fft_sin.png")?;
 
     // 窓関数のプロット
     let window = hamming(n_fft);
@@ -70,15 +67,15 @@ fn plot_sin_waves_fft() -> Result<(), Box<dyn std::error::Error>> {
     plot(times.iter().map(|x| *x), windowed.iter().map(|x| *x), "output/windowed_sin.png", Extent::new(0.0, 1.0, -10.0, 10.0))?;
 
     // 窓関数適用後のFFTのプロット
-    plot_fft(&windowed, n_fft, "output/fft_windowed_sin.png")?;
+    plot_fft(&windowed, "output/fft_windowed_sin.png")?;
 
     Ok(())
 }
 
-fn plot_fft(signal: &Array1<f32>, n_fft: usize, file_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn plot_fft(signal: &Array1<f32>, file_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     // FFT
     let mut planner = FftPlanner::new();
-    let fft = planner.plan_fft_forward(n_fft);
+    let fft = planner.plan_fft_forward(signal.len());
     let mut signal = signal.mapv(|x| Complex{ re: x, im: 0.0 }).to_vec();
     fft.process(&mut signal);
 
