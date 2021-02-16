@@ -30,23 +30,24 @@ fn stft(data: Array1<f32>, frame_len: usize, hop_len: usize) -> Array2::<f32> {
 
     // 行ごとにアサインしていく
     for (i, mut row) in frames.axis_iter_mut(Axis(0)).enumerate() {
-        let end = cmp::min(i*hop_len+frame_len, data.len());
-        
-        let mut fft_buf = Array1::<f32>::zeros(frame_len);
-        {
+        let ffted = {
+            let end = cmp::min(i*hop_len+frame_len, data.len());
             let data_slice = &data.slice(s![i*hop_len..end]);
             
+            let mut fft_buf = Array1::<f32>::zeros(frame_len);
             fft_buf
             .slice_mut(s![..data_slice.len()])
             .assign(data_slice);
-        }
-        // 窓関数適用
-        fft_buf *= &window;
 
-        // FFT
-        fft_buf = fft(&fft_func, fft_buf);
+            // 窓関数適用
+            fft_buf *= &window;
 
-        row.assign(&fft_buf);
+            // FFT
+            fft_buf = fft(&fft_func, fft_buf);
+            fft_buf
+        };
+
+        row.assign(&ffted);
     }
     
     frames
