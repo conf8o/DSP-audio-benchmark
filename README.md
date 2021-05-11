@@ -1,4 +1,4 @@
-# DSP_audio_benchmark
+# DSP-audio-benchmark
 音声ファイル取得からMFCC(メル周波数ケプストラム係数)への変換までのベンチマーク
 
 ## 候補
